@@ -118,6 +118,7 @@
             font-size: 0.9em;
             color: #7f8c8d;
             margin-top: 10px;
+            line-height: 1.4;
         }
         
         .no-results {
@@ -161,6 +162,13 @@
             color: #856404;
             line-height: 1.6;
         }
+
+        .loading-message {
+            text-align: center;
+            padding: 20px;
+            color: #6c757d;
+            font-style: italic;
+        }
     </style>
 </head>
 <body>
@@ -176,8 +184,12 @@
                 <p>Type the trade name (brand name) of any drug to find its scientific name. Click on any result to copy the scientific name for your prescription.</p>
             </div>
             
+            <div class="loading-message" id="loadingMessage">
+                Loading drug database... Please wait.
+            </div>
+            
             <div class="search-box">
-                <input type="text" id="searchInput" class="search-input" placeholder="Enter trade name (e.g., Panadol, Augmentin, Zithromax)..." autocomplete="off">
+                <input type="text" id="searchInput" class="search-input" placeholder="Loading drugs..." autocomplete="off" disabled>
                 <span class="search-icon">🔍</span>
             </div>
             
@@ -187,287 +199,310 @@
         </div>
     </div>
 
-   <script>
-    let drugData = [];
+    <script>
+        let drugData = [];
 
-    async function loadDrugData() {
-        try {
-            console.log('Loading drug data from CSV...');
-            // Updated filename to match your uploaded file
-            const response = await fetch('./SFDA Drug List - Users.csv');
-            const csvText = await response.text();
-            
-            // Parse CSV
-            const lines = csvText.split('\n');
-            console.log(`Found ${lines.length} lines in CSV`);
-            
-            // Get the header line to understand column structure
-            const headers = parseCSVLine(lines[0]);
-            console.log('Headers:', headers);
-            
-            // Find column indices dynamically
-            const tradeNameIndex = headers.findIndex(h => 
-                h.toLowerCase().includes('trade') || 
-                h.toLowerCase().includes('brand')
-            );
-            const scientificNameIndex = headers.findIndex(h => 
-                h.toLowerCase().includes('scientific') || 
-                h.toLowerCase().includes('generic')
-            );
-            const strengthIndex = headers.findIndex(h => 
-                h.toLowerCase().includes('strength')
-            );
-            const formIndex = headers.findIndex(h => 
-                h.toLowerCase().includes('form') || 
-                h.toLowerCase().includes('pharmaceutical')
-            );
-            
-            console.log('Column indices:', {
-                tradeName: tradeNameIndex,
-                scientific: scientificNameIndex,
-                strength: strengthIndex,
-                form: formIndex
-            });
-            
-            // Process data rows
-            drugData = [];
-            for (let i = 1; i < lines.length; i++) {
-                const line = lines[i].trim();
-                if (!line) continue;
-                
-                const cells = parseCSVLine(line);
-                
-                const scientificName = cells[scientificNameIndex]?.trim();
-                const tradeName = cells[tradeNameIndex]?.trim();
-                const strength = cells[strengthIndex]?.trim();
-                const form = cells[formIndex]?.trim();
-                
-                if (tradeName && scientificName && tradeName !== '' && scientificName !== '') {
-                    drugData.push({
-                        tradeName: tradeName,
-                        scientificName: scientificName,
-                        strength: strength || '',
-                        form: form || ''
-                    });
-                }
-            }
-            
-            console.log(`Successfully loaded ${drugData.length} drugs`);
-            
-            // Update placeholder text
-            const searchInput = document.getElementById('searchInput');
-            if (searchInput) {
-                searchInput.placeholder = `Search from ${drugData.length} drugs (e.g., Panadol, Augmentin)...`;
-            }
-            
-            // Show loading success message
-            if (drugData.length > 0) {
-                console.log('Sample drugs loaded:', drugData.slice(0, 3));
-            }
-            
-        } catch (error) {
-            console.error('Error loading CSV:', error);
-            // Fallback to sample data if CSV fails to load
-            drugData = [
-                {
-                    tradeName: "PANADOL EXTRA TABLETS",
-                    scientificName: "ACETAMINOPHEN,CAFFEINE",
-                    strength: "500MG,65MG",
-                    form: "Tablet"
-                },
-                {
-                    tradeName: "AUGMENTIN 625MG TABLETS", 
-                    scientificName: "AMOXICILLIN,CLAVULANIC ACID",
-                    strength: "500MG,125MG",
-                    form: "Tablet"
-                },
-                {
-                    tradeName: "ZITHROMAX 250MG CAPSULES",
-                    scientificName: "AZITHROMYCIN",
-                    strength: "250MG",
-                    form: "Capsule"
-                }
-            ];
-            console.log('Using fallback sample data due to error');
-        }
-    }
-
-    // Helper function to parse CSV lines with quoted fields
-    function parseCSVLine(line) {
-        const result = [];
-        let current = '';
-        let inQuotes = false;
-        
-        for (let i = 0; i < line.length; i++) {
-            const char = line[i];
-            
-            if (char === '"') {
-                inQuotes = !inQuotes;
-            } else if (char === ',' && !inQuotes) {
-                result.push(current.trim());
-                current = '';
-            } else {
-                current += char;
-            }
-        }
-        result.push(current.trim());
-        return result;
-    }
-
-    function searchDrugs(query) {
-        if (!query || query.length < 2) {
-            document.getElementById('results').style.display = 'none';
-            return;
-        }
-
-        const filtered = drugData.filter(drug => 
-            drug.tradeName.toLowerCase().includes(query.toLowerCase()) ||
-            drug.scientificName.toLowerCase().includes(query.toLowerCase())
-        );
-
-        displayResults(filtered);
-    }
-
-function displayResults(drugs) {
-    const resultsContainer = document.getElementById('resultsContainer');
-    const results = document.getElementById('results');
-    
-    if (drugs.length === 0) {
-        resultsContainer.innerHTML = '<div class="no-results">No matching drugs found. Try a different name or partial spelling.</div>';
-        results.style.display = 'block';
-        return;
-    }
-
-    const html = drugs.slice(0, 20).map(drug => {
-        // Format strength with unit - show both separately and combined
-        let strengthDisplay = '';
-        if (drug.strength) {
-            if (drug.strengthUnit) {
-                strengthDisplay = `${drug.strength}${drug.strengthUnit}`;
-            } else {
-                strengthDisplay = drug.strength;
-            }
-        }
-        
-        // Create detailed info array with strength prominently displayed
-        const details = [];
-        if (strengthDisplay) details.push(`💊 ${strengthDisplay}`);
-        if (drug.form) details.push(drug.form);
-        if (drug.route && drug.route !== drug.form) details.push(drug.route);
-        if (drug.status) details.push(drug.status);
-        if (drug.packageSize) details.push(`📦 ${drug.packageSize} units`);
-        
-        // Manufacturer info
-        let manufacturerInfo = '';
-        if (drug.manufacturer) {
-            manufacturerInfo = drug.manufacturer;
-            if (drug.country && drug.country !== drug.manufacturer) {
-                manufacturerInfo += ` (${drug.country})`;
-            }
-        }
-        
-        return `
-            <div class="result-item" onclick="copyToClipboard('${escapeQuotes(drug.scientificName)}', this)">
-                <div class="trade-name">${escapeHtml(drug.tradeName)}</div>
-                <div class="scientific-name">
-                    ${escapeHtml(drug.scientificName)}
-                    <button class="copy-btn" onclick="event.stopPropagation(); copyToClipboard('${escapeQuotes(drug.scientificName)}', this)">
-                        📋 Copy
-                    </button>
-                </div>
-                <div class="strength-form">
-                    ${details.join(' • ')}
-                    ${manufacturerInfo ? `<br><small style="color: #6c757d;">Mfg: ${escapeHtml(manufacturerInfo)}</small>` : ''}
-                    ${drug.atc ? `<br><small style="color: #6c757d;">ATC: ${escapeHtml(drug.atc)}</small>` : ''}
-                </div>
-            </div>
-        `;
-    }).join('');
-
-    resultsContainer.innerHTML = html;
-    results.style.display = 'block';
-}
-
-        // Show top 20 results to avoid overwhelming the interface
-        const html = drugs.slice(0, 20).map(drug => `
-            <div class="result-item" onclick="copyToClipboard('${escapeQuotes(drug.scientificName)}', this)">
-                <div class="trade-name">${escapeHtml(drug.tradeName)}</div>
-                <div class="scientific-name">
-                    ${escapeHtml(drug.scientificName)}
-                    <button class="copy-btn" onclick="event.stopPropagation(); copyToClipboard('${escapeQuotes(drug.scientificName)}', this)">
-                        📋 Copy
-                    </button>
-                </div>
-                <div class="strength-form">${escapeHtml(drug.strength)} ${drug.form ? '• ' + escapeHtml(drug.form) : ''}</div>
-            </div>
-        `).join('');
-
-        resultsContainer.innerHTML = html;
-        results.style.display = 'block';
-    }
-
-    function escapeQuotes(str) {
-        return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
-    }
-
-    function escapeHtml(str) {
-        const div = document.createElement('div');
-        div.textContent = str || '';
-        return div.innerHTML;
-    }
-
-    function copyToClipboard(text, element) {
-        navigator.clipboard.writeText(text).then(() => {
-            const button = element.querySelector('.copy-btn');
-            if (button) {
-                button.textContent = '✅ Copied!';
-                button.style.background = '#27ae60';
-                setTimeout(() => {
-                    button.textContent = '📋 Copy';
-                }, 2000);
-            }
-            
-            element.style.background = '#d4edda';
-            element.style.borderColor = '#27ae60';
-            setTimeout(() => {
-                element.style.background = '#f8f9fa';
-                element.style.borderColor = '#e9ecef';
-            }, 1000);
-        }).catch(() => {
-            // Fallback for browsers that don't support clipboard API
-            const textArea = document.createElement('textarea');
-            textArea.value = text;
-            document.body.appendChild(textArea);
-            textArea.select();
+        async function loadDrugData() {
             try {
-                document.execCommand('copy');
-                alert(`Copied: ${text}`);
-            } catch (err) {
-                alert(`Scientific name: ${text}`);
-            }
-            document.body.removeChild(textArea);
-        });
-    }
-
-    // Event listeners
-    document.addEventListener('DOMContentLoaded', function() {
-        const searchInput = document.getElementById('searchInput');
-        
-        if (searchInput) {
-            searchInput.addEventListener('input', (e) => {
-                searchDrugs(e.target.value);
-            });
-
-            searchInput.addEventListener('focus', () => {
-                if (searchInput.value.length >= 2) {
-                    searchDrugs(searchInput.value);
+                console.log('Loading drug data from CSV...');
+                const response = await fetch('./SFDA Drug List - Users.csv');
+                const csvText = await response.text();
+                
+                const lines = csvText.split('\n');
+                console.log(`Found ${lines.length} lines in CSV`);
+                
+                const headers = parseCSVLine(lines[0]);
+                console.log('Headers:', headers);
+                
+                // Find all relevant column indices
+                const tradeNameIndex = headers.findIndex(h => h.toLowerCase().includes('trade'));
+                const scientificNameIndex = headers.findIndex(h => h.toLowerCase().includes('scientific'));
+                const strengthIndex = headers.findIndex(h => h.toLowerCase().includes('strength') && !h.toLowerCase().includes('unit'));
+                const strengthUnitIndex = headers.findIndex(h => h.toLowerCase().includes('strengthunit'));
+                const formIndex = headers.findIndex(h => h.toLowerCase().includes('pharmaceutical') || h.toLowerCase().includes('form'));
+                const routeIndex = headers.findIndex(h => h.toLowerCase().includes('route') || h.toLowerCase().includes('administration'));
+                const statusIndex = headers.findIndex(h => h.toLowerCase().includes('legal') || h.toLowerCase().includes('status'));
+                const manufacturerIndex = headers.findIndex(h => h.toLowerCase().includes('manufacture') && h.toLowerCase().includes('name'));
+                const countryIndex = headers.findIndex(h => h.toLowerCase().includes('manufacture') && h.toLowerCase().includes('country'));
+                const packageSizeIndex = headers.findIndex(h => h.toLowerCase().includes('package') && h.toLowerCase().includes('size'));
+                const atcIndex = headers.findIndex(h => h.toLowerCase().includes('atc'));
+                
+                console.log('Column indices found:', {
+                    tradeName: tradeNameIndex,
+                    scientific: scientificNameIndex,
+                    strength: strengthIndex,
+                    strengthUnit: strengthUnitIndex,
+                    form: formIndex,
+                    route: routeIndex,
+                    status: statusIndex,
+                    manufacturer: manufacturerIndex,
+                    country: countryIndex,
+                    packageSize: packageSizeIndex,
+                    atc: atcIndex
+                });
+                
+                // Process data with enhanced information
+                drugData = [];
+                for (let i = 1; i < lines.length; i++) {
+                    const line = lines[i].trim();
+                    if (!line) continue;
+                    
+                    const cells = parseCSVLine(line);
+                    
+                    const tradeName = cells[tradeNameIndex]?.trim();
+                    const scientificName = cells[scientificNameIndex]?.trim();
+                    const strength = cells[strengthIndex]?.trim();
+                    const strengthUnit = cells[strengthUnitIndex]?.trim();
+                    const form = cells[formIndex]?.trim();
+                    const route = cells[routeIndex]?.trim();
+                    const status = cells[statusIndex]?.trim();
+                    const manufacturer = cells[manufacturerIndex]?.trim();
+                    const country = cells[countryIndex]?.trim();
+                    const packageSize = cells[packageSizeIndex]?.trim();
+                    const atc = cells[atcIndex]?.trim();
+                    
+                    if (tradeName && scientificName && tradeName !== '' && scientificName !== '') {
+                        drugData.push({
+                            tradeName: tradeName,
+                            scientificName: scientificName,
+                            strength: strength || '',
+                            strengthUnit: strengthUnit || '',
+                            form: form || '',
+                            route: route || '',
+                            status: status || '',
+                            manufacturer: manufacturer || '',
+                            country: country || '',
+                            packageSize: packageSize || '',
+                            atc: atc || ''
+                        });
+                    }
                 }
+                
+                console.log(`Successfully loaded ${drugData.length} drugs`);
+                
+                // Update UI after successful loading
+                const searchInput = document.getElementById('searchInput');
+                const loadingMessage = document.getElementById('loadingMessage');
+                
+                if (searchInput) {
+                    searchInput.placeholder = `Search from ${drugData.length} drugs (e.g., Panadol, Augmentin)...`;
+                    searchInput.disabled = false;
+                    searchInput.focus();
+                }
+                
+                if (loadingMessage) {
+                    loadingMessage.style.display = 'none';
+                }
+                
+                console.log('Sample drugs loaded:', drugData.slice(0, 3));
+                
+            } catch (error) {
+                console.error('Error loading CSV:', error);
+                
+                // Enhanced fallback data
+                drugData = [
+                    {
+                        tradeName: "PANADOL EXTRA TABLETS",
+                        scientificName: "ACETAMINOPHEN,CAFFEINE",
+                        strength: "500",
+                        strengthUnit: "mg",
+                        form: "Tablet",
+                        route: "Oral use",
+                        status: "OTC",
+                        manufacturer: "GSK",
+                        country: "UAE",
+                        packageSize: "20",
+                        atc: "N02BE01"
+                    },
+                    {
+                        tradeName: "AUGMENTIN 625MG TABLETS", 
+                        scientificName: "AMOXICILLIN,CLAVULANIC ACID",
+                        strength: "625",
+                        strengthUnit: "mg",
+                        form: "Tablet",
+                        route: "Oral use",
+                        status: "Prescription",
+                        manufacturer: "GSK",
+                        country: "UK",
+                        packageSize: "14",
+                        atc: "J01CR02"
+                    }
+                ];
+                
+                // Update UI for fallback
+                const searchInput = document.getElementById('searchInput');
+                const loadingMessage = document.getElementById('loadingMessage');
+                
+                if (searchInput) {
+                    searchInput.placeholder = `Search sample drugs (CSV loading failed)...`;
+                    searchInput.disabled = false;
+                }
+                
+                if (loadingMessage) {
+                    loadingMessage.textContent = 'Using sample data - CSV loading failed. Please check console for details.';
+                    loadingMessage.style.color = '#dc3545';
+                }
+            }
+        }
+
+        // Helper function to parse CSV lines with quoted fields
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            result.push(current.trim());
+            return result;
+        }
+
+        function searchDrugs(query) {
+            if (!query || query.length < 2) {
+                document.getElementById('results').style.display = 'none';
+                return;
+            }
+
+            const filtered = drugData.filter(drug => 
+                drug.tradeName.toLowerCase().includes(query.toLowerCase()) ||
+                drug.scientificName.toLowerCase().includes(query.toLowerCase())
+            );
+
+            displayResults(filtered);
+        }
+
+        function displayResults(drugs) {
+            const resultsContainer = document.getElementById('resultsContainer');
+            const results = document.getElementById('results');
+            
+            if (drugs.length === 0) {
+                resultsContainer.innerHTML = '<div class="no-results">No matching drugs found. Try a different name or partial spelling.</div>';
+                results.style.display = 'block';
+                return;
+            }
+
+            const html = drugs.slice(0, 20).map(drug => {
+                // Format strength with unit - show both separately and combined
+                let strengthDisplay = '';
+                if (drug.strength) {
+                    if (drug.strengthUnit) {
+                        strengthDisplay = `${drug.strength}${drug.strengthUnit}`;
+                    } else {
+                        strengthDisplay = drug.strength;
+                    }
+                }
+                
+                // Create detailed info array with strength prominently displayed
+                const details = [];
+                if (strengthDisplay) details.push(`💊 ${strengthDisplay}`);
+                if (drug.form) details.push(drug.form);
+                if (drug.route && drug.route !== drug.form) details.push(drug.route);
+                if (drug.status) details.push(drug.status);
+                if (drug.packageSize) details.push(`📦 ${drug.packageSize} units`);
+                
+                // Manufacturer info
+                let manufacturerInfo = '';
+                if (drug.manufacturer) {
+                    manufacturerInfo = drug.manufacturer;
+                    if (drug.country && drug.country !== drug.manufacturer) {
+                        manufacturerInfo += ` (${drug.country})`;
+                    }
+                }
+                
+                return `
+                    <div class="result-item" onclick="copyToClipboard('${escapeQuotes(drug.scientificName)}', this)">
+                        <div class="trade-name">${escapeHtml(drug.tradeName)}</div>
+                        <div class="scientific-name">
+                            ${escapeHtml(drug.scientificName)}
+                            <button class="copy-btn" onclick="event.stopPropagation(); copyToClipboard('${escapeQuotes(drug.scientificName)}', this)">
+                                📋 Copy
+                            </button>
+                        </div>
+                        <div class="strength-form">
+                            ${details.join(' • ')}
+                            ${manufacturerInfo ? `<br><small style="color: #6c757d;">Mfg: ${escapeHtml(manufacturerInfo)}</small>` : ''}
+                            ${drug.atc ? `<br><small style="color: #6c757d;">ATC: ${escapeHtml(drug.atc)}</small>` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            resultsContainer.innerHTML = html;
+            results.style.display = 'block';
+        }
+
+        function escapeQuotes(str) {
+            return str.replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str || '';
+            return div.innerHTML;
+        }
+
+        function copyToClipboard(text, element) {
+            navigator.clipboard.writeText(text).then(() => {
+                const button = element.querySelector('.copy-btn');
+                if (button) {
+                    button.textContent = '✅ Copied!';
+                    button.style.background = '#27ae60';
+                    setTimeout(() => {
+                        button.textContent = '📋 Copy';
+                    }, 2000);
+                }
+                
+                element.style.background = '#d4edda';
+                element.style.borderColor = '#27ae60';
+                setTimeout(() => {
+                    element.style.background = '#f8f9fa';
+                    element.style.borderColor = '#e9ecef';
+                }, 1000);
+            }).catch(() => {
+                // Fallback for browsers that don't support clipboard API
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    alert(`Copied: ${text}`);
+                } catch (err) {
+                    alert(`Scientific name: ${text}`);
+                }
+                document.body.removeChild(textArea);
             });
         }
 
-        // Load data when page loads
-        loadDrugData();
-    });
-</script>
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('searchInput');
+            
+            if (searchInput) {
+                searchInput.addEventListener('input', (e) => {
+                    searchDrugs(e.target.value);
+                });
+
+                searchInput.addEventListener('focus', () => {
+                    if (searchInput.value.length >= 2) {
+                        searchDrugs(searchInput.value);
+                    }
+                });
+            }
+
+            // Load data when page loads
+            loadDrugData();
+        });
+    </script>
 </body>
 </html>
