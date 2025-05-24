@@ -328,15 +328,65 @@
         displayResults(filtered);
     }
 
-    function displayResults(drugs) {
-        const resultsContainer = document.getElementById('resultsContainer');
-        const results = document.getElementById('results');
-        
-        if (drugs.length === 0) {
-            resultsContainer.innerHTML = '<div class="no-results">No matching drugs found. Try a different name or partial spelling.</div>';
-            results.style.display = 'block';
-            return;
+function displayResults(drugs) {
+    const resultsContainer = document.getElementById('resultsContainer');
+    const results = document.getElementById('results');
+    
+    if (drugs.length === 0) {
+        resultsContainer.innerHTML = '<div class="no-results">No matching drugs found. Try a different name or partial spelling.</div>';
+        results.style.display = 'block';
+        return;
+    }
+
+    const html = drugs.slice(0, 20).map(drug => {
+        // Format strength with unit - show both separately and combined
+        let strengthDisplay = '';
+        if (drug.strength) {
+            if (drug.strengthUnit) {
+                strengthDisplay = `${drug.strength}${drug.strengthUnit}`;
+            } else {
+                strengthDisplay = drug.strength;
+            }
         }
+        
+        // Create detailed info array with strength prominently displayed
+        const details = [];
+        if (strengthDisplay) details.push(`💊 ${strengthDisplay}`);
+        if (drug.form) details.push(drug.form);
+        if (drug.route && drug.route !== drug.form) details.push(drug.route);
+        if (drug.status) details.push(drug.status);
+        if (drug.packageSize) details.push(`📦 ${drug.packageSize} units`);
+        
+        // Manufacturer info
+        let manufacturerInfo = '';
+        if (drug.manufacturer) {
+            manufacturerInfo = drug.manufacturer;
+            if (drug.country && drug.country !== drug.manufacturer) {
+                manufacturerInfo += ` (${drug.country})`;
+            }
+        }
+        
+        return `
+            <div class="result-item" onclick="copyToClipboard('${escapeQuotes(drug.scientificName)}', this)">
+                <div class="trade-name">${escapeHtml(drug.tradeName)}</div>
+                <div class="scientific-name">
+                    ${escapeHtml(drug.scientificName)}
+                    <button class="copy-btn" onclick="event.stopPropagation(); copyToClipboard('${escapeQuotes(drug.scientificName)}', this)">
+                        📋 Copy
+                    </button>
+                </div>
+                <div class="strength-form">
+                    ${details.join(' • ')}
+                    ${manufacturerInfo ? `<br><small style="color: #6c757d;">Mfg: ${escapeHtml(manufacturerInfo)}</small>` : ''}
+                    ${drug.atc ? `<br><small style="color: #6c757d;">ATC: ${escapeHtml(drug.atc)}</small>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    resultsContainer.innerHTML = html;
+    results.style.display = 'block';
+}
 
         // Show top 20 results to avoid overwhelming the interface
         const html = drugs.slice(0, 20).map(drug => `
