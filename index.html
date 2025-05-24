@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drug Lookup - Trade to Scientific Name</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(45deg, #2c3e50, #3498db);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.9;
+        }
+        
+        .search-section {
+            padding: 40px;
+        }
+        
+        .search-box {
+            position: relative;
+            margin-bottom: 30px;
+        }
+        
+        .search-input {
+            width: 100%;
+            padding: 20px 60px 20px 20px;
+            font-size: 1.2em;
+            border: 3px solid #e0e0e0;
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+        
+        .search-input:focus {
+            border-color: #3498db;
+            box-shadow: 0 0 20px rgba(52, 152, 219, 0.2);
+        }
+        
+        .search-icon {
+            position: absolute;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #bbb;
+            font-size: 1.5em;
+        }
+        
+        .results {
+            display: none;
+        }
+        
+        .result-item {
+            background: #f8f9fa;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .result-item:hover {
+            background: #e3f2fd;
+            border-color: #2196f3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .trade-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        
+        .scientific-name {
+            font-size: 1.1em;
+            color: #27ae60;
+            background: #d5f4e6;
+            padding: 10px 15px;
+            border-radius: 5px;
+            border-left: 4px solid #27ae60;
+        }
+        
+        .strength-form {
+            font-size: 0.9em;
+            color: #7f8c8d;
+            margin-top: 10px;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #7f8c8d;
+            font-size: 1.1em;
+        }
+        
+        .copy-btn {
+            background: #27ae60;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            font-size: 0.9em;
+            cursor: pointer;
+            margin-left: 10px;
+            transition: all 0.3s ease;
+        }
+        
+        .copy-btn:hover {
+            background: #219a52;
+            transform: scale(1.05);
+        }
+        
+        .instructions {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .instructions h3 {
+            color: #856404;
+            margin-bottom: 10px;
+        }
+        
+        .instructions p {
+            color: #856404;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔍 Drug Lookup</h1>
+            <p>Find Scientific Names from Trade Names</p>
+        </div>
+        
+        <div class="search-section">
+            <div class="instructions">
+                <h3>How to Use:</h3>
+                <p>Type the trade name (brand name) of any drug to find its scientific name. Click on any result to copy the scientific name for your prescription.</p>
+            </div>
+            
+            <div class="search-box">
+                <input type="text" id="searchInput" class="search-input" placeholder="Enter trade name (e.g., Panadol, Augmentin, Zithromax)..." autocomplete="off">
+                <span class="search-icon">🔍</span>
+            </div>
+            
+            <div id="results" class="results">
+                <div id="resultsContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Sample drug data - in real implementation, this would come from your Airtable
+        const drugData = [
+            {
+                tradeName: "PANADOL EXTRA TABLETS",
+                scientificName: "ACETAMINOPHEN,CAFFEINE",
+                strength: "500MG,65MG",
+                form: "Tablet"
+            },
+            {
+                tradeName: "AUGMENTIN 625MG TABLETS",
+                scientificName: "AMOXICILLIN,CLAVULANIC ACID",
+                strength: "500MG,125MG",
+                form: "Tablet"
+            },
+            {
+                tradeName: "ZITHROMAX 250MG CAPSULES",
+                scientificName: "AZITHROMYCIN",
+                strength: "250MG",
+                form: "Capsule"
+            },
+            {
+                tradeName: "VENTOLIN INHALER",
+                scientificName: "SALBUTAMOL",
+                strength: "100MCG",
+                form: "Inhaler"
+            },
+            {
+                tradeName: "LIPITOR 20MG TABLETS",
+                scientificName: "ATORVASTATIN",
+                strength: "20MG",
+                form: "Tablet"
+            },
+            {
+                tradeName: "GLUCOPHAGE 500MG TABLETS",
+                scientificName: "METFORMIN",
+                strength: "500MG",
+                form: "Tablet"
+            },
+            {
+                tradeName: "NORVASC 5MG TABLETS",
+                scientificName: "AMLODIPINE",
+                strength: "5MG",
+                form: "Tablet"
+            },
+            {
+                tradeName: "COZAAR 50MG TABLETS",
+                scientificName: "LOSARTAN",
+                strength: "50MG",
+                form: "Tablet"
+            }
+        ];
+
+        const searchInput = document.getElementById('searchInput');
+        const results = document.getElementById('results');
+        const resultsContainer = document.getElementById('resultsContainer');
+
+        function searchDrugs(query) {
+            if (!query || query.length < 2) {
+                results.style.display = 'none';
+                return;
+            }
+
+            const filtered = drugData.filter(drug => 
+                drug.tradeName.toLowerCase().includes(query.toLowerCase()) ||
+                drug.scientificName.toLowerCase().includes(query.toLowerCase())
+            );
+
+            displayResults(filtered);
+        }
+
+        function displayResults(drugs) {
+            if (drugs.length === 0) {
+                resultsContainer.innerHTML = '<div class="no-results">No matching drugs found. Try a different name or partial spelling.</div>';
+                results.style.display = 'block';
+                return;
+            }
+
+            const html = drugs.map(drug => `
+                <div class="result-item" onclick="copyToClipboard('${drug.scientificName}', this)">
+                    <div class="trade-name">${drug.tradeName}</div>
+                    <div class="scientific-name">
+                        ${drug.scientificName}
+                        <button class="copy-btn" onclick="event.stopPropagation(); copyToClipboard('${drug.scientificName}', this)">
+                            📋 Copy
+                        </button>
+                    </div>
+                    <div class="strength-form">${drug.strength} • ${drug.form}</div>
+                </div>
+            `).join('');
+
+            resultsContainer.innerHTML = html;
+            results.style.display = 'block';
+        }
+
+        function copyToClipboard(text, element) {
+            navigator.clipboard.writeText(text).then(() => {
+                const originalText = element.querySelector('.copy-btn')?.textContent || 'Copied!';
+                const button = element.querySelector('.copy-btn');
+                if (button) {
+                    button.textContent = '✅ Copied!';
+                    button.style.background = '#27ae60';
+                    setTimeout(() => {
+                        button.textContent = '📋 Copy';
+                        button.style.background = '#27ae60';
+                    }, 2000);
+                }
+                
+                // Visual feedback for the entire item
+                element.style.background = '#d4edda';
+                element.style.borderColor = '#27ae60';
+                setTimeout(() => {
+                    element.style.background = '#f8f9fa';
+                    element.style.borderColor = '#e9ecef';
+                }, 1000);
+            }).catch(() => {
+                alert(`Scientific name: ${text}`);
+            });
+        }
+
+        searchInput.addEventListener('input', (e) => {
+            searchDrugs(e.target.value);
+        });
+
+        searchInput.addEventListener('focus', () => {
+            if (searchInput.value.length >= 2) {
+                searchDrugs(searchInput.value);
+            }
+        });
+
+        // Auto-focus on the search input
+        searchInput.focus();
+    </script>
+</body>
+</html>
